@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stuck in a Dream</title>
+<meta name="description" content="A free first-person horror game made in 48 hours: escape a looping dream forest, find the three portal pieces, and don't keep looking at the thing in the trees.">
+<meta property="og:title" content="Stuck in a Dream">
+<meta property="og:description" content="Free first-person horror for Windows. Made in 48 hours.">
+<meta property="og:image" content="assets/stalker.jpg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2307060f'/%3E%3Crect x='2' y='2' width='12' height='12' fill='none' stroke='%23c8c4ff'/%3E%3Crect x='5' y='6' width='2' height='2' fill='%23c8c4ff'/%3E%3Crect x='9' y='6' width='2' height='2' fill='%23c8c4ff'/%3E%3Crect x='5' y='10' width='6' height='1' fill='%23c8c4ff'/%3E%3C/svg%3E">
+<style>
+  @font-face { font-family: "Dossier"; src: url("assets/DossierPixel.woff2") format("woff2"); font-display: block; }
+  @font-face { font-family: "DossierBold"; src: url("assets/DossierPixel-Bold.woff2") format("woff2"); font-display: block; }
+  :root {
+    --ink: #c8c4ff;
+    --dim: rgba(200, 196, 255, 0.58);
+    --faint: rgba(200, 196, 255, 0.24);
+    --paper: #0a0916;
+    --night: #05040b;
+    --glow: 0 0 6px rgba(200, 196, 255, 0.45);
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--night); }
+  body {
+    margin: 0; color: var(--ink); background: radial-gradient(ellipse at 50% 30%, #100d24 0%, var(--night) 70%);
+    font-family: "Dossier", ui-monospace, Consolas, monospace; font-size: 20px; line-height: 1.5;
+    -webkit-font-smoothing: none; text-rendering: optimizeSpeed; min-height: 100vh;
+  }
+  /* The tube: scanlines, a slow rolling band and dark corners over everything. */
+  body::before, body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+  body::before { background: repeating-linear-gradient(to bottom, rgba(0,0,0,0.24) 0 1px, transparent 1px 3px); }
+  body::after {
+    background: linear-gradient(to bottom, transparent 0, rgba(200,196,255,0.035) 50%, transparent 100%) 0 -30vh / 100% 30vh no-repeat,
+                radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.6) 100%);
+    animation: roll 9s linear infinite;
+  }
+  @keyframes roll { to { background-position: 0 130vh, 0 0; } }
+  @media (prefers-reduced-motion: reduce) { body::after { animation: none; } }
+  a { color: var(--ink); }
+  .file { max-width: 1060px; margin: 0 auto; padding: 28px 16px 56px; }
+  .panel { position: relative; border: 1.5px solid var(--ink); background: rgba(10, 9, 22, 0.92); }
+  .panel::before, .panel::after { content: ""; position: absolute; width: 5px; height: 5px; background: var(--ink); }
+  /* Nodes on two corners, like the joints of the in-game file. */
+  .panel::before { top: -3px; left: -3px; }
+  .panel::after { bottom: -3px; right: -3px; }
+  .bold, h1, h2, .btn, .row b { font-family: "DossierBold", ui-monospace, Consolas, monospace; font-weight: normal; text-shadow: var(--glow); letter-spacing: 0.02em; }
+  h1 { font-size: 50px; line-height: 1.1; margin: 0; }
+  h2 { font-size: 30px; margin: 0 0 14px; }
+  .header { display: flex; align-items: center; gap: 16px; padding: 14px 20px; margin-bottom: 14px; }
+  .header .status { margin-left: auto; color: var(--dim); font-size: 30px; white-space: nowrap; }
+  .battery { display: inline-flex; gap: 3px; padding: 4px; border: 1.5px solid var(--ink); margin-left: 12px; vertical-align: middle; }
+  .battery i { display: block; width: 8px; height: 12px; background: var(--ink); }
+  .battery i:last-child { animation: blink 1.2s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; align-items: start; }
+  .shot { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+  .shot-frame { padding: 12px; }
+  .chrome { display: flex; justify-content: space-between; color: var(--dim); font-size: 15px; padding: 0 2px 8px; }
+  .chrome span:last-child::after { content: "\25a1\25a1\25a1"; letter-spacing: 4px; }
+  .rows { padding: 4px 0; }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 16px; border-bottom: 1px solid var(--faint); }
+  .row:last-child { border-bottom: 0; }
+  .row b { white-space: nowrap; }
+  .row span { text-align: right; }
+  .btn {
+    display: block; text-align: center; text-decoration: none; font-size: 30px; padding: 16px 12px; margin-top: 14px;
+    border: 1.5px solid var(--ink); color: var(--ink); background: transparent; transition: background 0.08s, color 0.08s;
+  }
+  .btn:hover, .btn:focus-visible { background: var(--ink); color: var(--paper); text-shadow: none; outline: none; }
+  .btn small { display: block; font-family: "Dossier", monospace; font-size: 15px; margin-top: 4px; }
+  .note { color: var(--dim); font-size: 15px; margin: 10px 2px 0; }
+  .section { margin-top: 14px; padding: 18px 20px; }
+  .lede { margin: 0; max-width: 62ch; }
+  .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .gallery figure { margin: 0; }
+  .gallery figcaption { color: var(--dim); font-size: 15px; padding-top: 6px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .credits { font-size: 15px; color: var(--dim); }
+  .credits p { margin: 0 0 8px; }
+  .credits b { color: var(--ink); font-family: "Dossier", monospace; font-weight: normal; }
+  .footer { display: flex; justify-content: space-between; gap: 12px; color: var(--dim); font-size: 15px; margin-top: 14px; padding: 0 2px; }
+  @media (max-width: 820px) {
+    body { font-size: 15px; }
+    h1 { font-size: 30px; }
+    h2, .header .status, .btn { font-size: 20px; }
+    .grid, .two, .gallery { grid-template-columns: 1fr; }
+    .header { flex-wrap: wrap; }
+    .header .status { margin-left: 0; font-size: 15px; }
+    .footer { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<main class="file">
+
+  <header class="panel header">
+    <h1>STUCK IN A DREAM</h1>
+    <div class="status bold">// SUBJECT D-23<span class="battery" aria-hidden="true"><i></i><i></i><i></i></span></div>
+  </header>
+
+  <div class="grid">
+    <div class="panel shot-frame">
+      <div class="chrome"><span>PREVIEW</span><span></span></div>
+      <img class="shot" src="assets/stalker.jpg" width="1280" height="720" alt="A tall figure of black tar and bone with a computer window for a head, standing in a dark forest lit by a flashlight.">
+    </div>
+    <div>
+      <div class="panel rows">
+        <div class="row"><b>GENRE</b><span>FIRST-PERSON HORROR</span></div>
+        <div class="row"><b>PLATFORM</b><span>WINDOWS 64-BIT</span></div>
+        <div class="row"><b>SIZE</b><span id="size">425 MB DOWNLOAD</span></div>
+        <div class="row"><b>PRICE</b><span>FREE</span></div>
+        <div class="row"><b>MADE IN</b><span>48 HOURS</span></div>
+        <div class="row"><b>THREAT</b><span>&#9733;&#9733;&#9734;</span></div>
+      </div>
+      <a class="btn" href="https://github.com/TylerKoa/stuck-in-a-dream/releases/latest/download/StuckInADream-Windows.zip">DOWNLOAD<small>Windows 10/11, 64-bit &middot; free</small></a>
+      <p class="note">Unzip it and run HorrorGameJam10_23.exe. Windows may say it protected your PC (the game isn't signed): click More info, then Run anyway.</p>
+    </div>
+  </div>
+
+  <section class="panel section">
+    <h2>THE FILE</h2>
+    <p class="lede">You fell asleep and woke up in a forest that never ends, under a swirling purple sky. Three pieces of a portal are your only way out, and each one is locked behind a surveillance camera fed by a generator. Use your goggles to find the generators, shoot them, and take the pieces. Drones hunt you, spiders leap for your face, and something made of tar and old computer windows follows you through the trees. Don't keep looking at it.</p>
+  </section>
+
+  <section class="panel section">
+    <h2>SURVEILLANCE STILLS</h2>
+    <div class="gallery">
+      <figure><img class="shot" src="assets/goggles.jpg" width="1280" height="720" loading="lazy" alt="The goggles' CCTV feed boxing a generator, transformers and a camera through the trees."><figcaption>The goggles see through the trees.</figcaption></figure>
+      <figure><img class="shot" src="assets/spider.jpg" width="1280" height="720" loading="lazy" alt="A pale spider leaping belly-first at the player's face under a red sky."><figcaption>They go for the face.</figcaption></figure>
+      <figure><img class="shot" src="assets/edge.jpg" width="1280" height="720" loading="lazy" alt="The tar figure glitching at the edge of the view, beside lit pine trees."><figcaption>It waits at the edge of your view.</figcaption></figure>
+      <figure><img class="shot" src="assets/dossier.jpg" width="727" height="829" loading="lazy" alt="The pause screen: a lavender CRT file on Subject D-23 with dithered photos and stats."><figcaption>Your file.</figcaption></figure>
+    </div>
+  </section>
+
+  <div class="two">
+    <section class="panel section">
+      <h2>CONTROLS</h2>
+      <div class="rows">
+        <div class="row"><b>WASD</b><span>MOVE</span></div>
+        <div class="row"><b>MOUSE</b><span>LOOK</span></div>
+        <div class="row"><b>LEFT CLICK</b><span>SHOOT</span></div>
+        <div class="row"><b>RIGHT CLICK</b><span>AIM</span></div>
+        <div class="row"><b>1 / 2</b><span>PISTOL / GOGGLES</span></div>
+        <div class="row"><b>F</b><span>FLASHLIGHT</span></div>
+        <div class="row"><b>R / T</b><span>RELOAD / INSPECT</span></div>
+        <div class="row"><b>E</b><span>TAKE A PIECE</span></div>
+        <div class="row"><b>SPACE</b><span>JUMP</span></div>
+        <div class="row"><b>M</b><span>PAUSE</span></div>
+      </div>
+    </section>
+    <section class="panel section">
+      <h2>REQUIREMENTS</h2>
+      <div class="rows">
+        <div class="row"><b>OS</b><span>WINDOWS 10 / 11 64-BIT</span></div>
+        <div class="row"><b>GRAPHICS</b><span>DIRECTX 12 GPU</span></div>
+        <div class="row"><b>DISK</b><span id="disk">563 MB</span></div>
+        <div class="row"><b>BROWSER?</b><span>NO</span></div>
+      </div>
+      <p class="note">It's an Unreal Engine 5 game, and those can't run inside a web browser, so this page hands you the download instead.</p>
+    </section>
+  </div>
+
+  <section class="panel section credits">
+    <h2>CREDITS</h2>
+    <p>Made by Claude and ChatGPT for a 48-hour horror game jam, in Unreal Engine 5. Sound effects and music from <a href="https://pixabay.com">Pixabay</a>, used under the Pixabay Content License:</p>
+    <p><b>Single Gunshot 5.4</b> by morganpurkis (Freesound) &middot; <b>Short energy beam shot (3)</b> by Yodguard &middot; <b>HTF Flesh Impact 1</b> by RAGECore29 &middot; <b>Horror Ambient</b> by leberch &middot; <b>Drone Noise 01</b> by Alex_Jauk &middot; <b>MGS detected lead</b> by jobro (Freesound) &middot; <b>Angry Hissing Cockroach</b> by Kuzu420 &middot; <b>Scare</b> by MagiaZ &middot; <b>Footsteps Dirt Gravel</b> by revolt2563 (Freesound) &middot; <b>Glitch sound</b> by Axel_Sounds.</p>
+    <p>All other sounds were synthesized for the game.</p>
+  </section>
+
+  <footer class="footer"><span>FILE 01 // DO NOT WAKE</span><span>&#9632; REC</span></footer>
+</main>
+</body>
+</html>
